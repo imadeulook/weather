@@ -1,0 +1,801 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Agentic Loop — Погода</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600&family=Unbounded:wght@300;400;600&display=swap');
+
+  :root {
+    --bg: #0a0a0f;
+    --surface: #111118;
+    --surface2: #1a1a24;
+    --border: rgba(120,120,180,0.15);
+    --border2: rgba(120,120,180,0.3);
+    --accent: #7c6ff7;
+    --accent2: #4fd1a8;
+    --accent3: #f7a26f;
+    --text: #e8e8f0;
+    --muted: #6b6b88;
+    --mono: 'JetBrains Mono', monospace;
+    --display: 'Unbounded', sans-serif;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: var(--mono);
+    min-height: 100vh;
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    grid-template-rows: auto 1fr;
+    gap: 0;
+  }
+
+  /* HEADER */
+  header {
+    grid-column: 1 / -1;
+    padding: 28px 36px 20px;
+    border-bottom: 1px solid var(--border);
+    display: flex;
+    align-items: flex-end;
+    gap: 24px;
+  }
+  .logo {
+    font-family: var(--display);
+    font-size: 13px;
+    font-weight: 300;
+    letter-spacing: 0.2em;
+    color: var(--muted);
+    text-transform: uppercase;
+  }
+  .title {
+    font-family: var(--display);
+    font-size: 22px;
+    font-weight: 600;
+    color: var(--text);
+    letter-spacing: -0.02em;
+  }
+  .badge {
+    margin-left: auto;
+    font-size: 10px;
+    padding: 4px 10px;
+    border: 1px solid var(--accent);
+    border-radius: 2px;
+    color: var(--accent);
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+  }
+
+  /* LEFT PANEL — CODE */
+  .panel-code {
+    border-right: 1px solid var(--border);
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+  }
+  .panel-title {
+    padding: 14px 20px;
+    font-size: 10px;
+    letter-spacing: 0.15em;
+    text-transform: uppercase;
+    color: var(--muted);
+    border-bottom: 1px solid var(--border);
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+  .panel-title .dot { width:6px; height:6px; border-radius:50%; background: var(--accent); }
+  pre {
+    flex: 1;
+    overflow-y: auto;
+    padding: 20px;
+    font-size: 12.5px;
+    line-height: 1.75;
+    tab-size: 2;
+    background: var(--bg);
+  }
+  pre::-webkit-scrollbar { width: 4px; }
+  pre::-webkit-scrollbar-track { background: transparent; }
+  pre::-webkit-scrollbar-thumb { background: var(--border2); border-radius: 2px; }
+
+  .kw  { color: #bb8af7; }
+  .fn  { color: #7dd9c8; }
+  .str { color: #f7c06f; }
+  .cm  { color: #4a4a62; font-style: italic; }
+  .num { color: #f79e72; }
+  .key { color: #7ec8f7; }
+  .hl  { background: rgba(124,111,247,0.12); display:block; margin: 0 -20px; padding: 0 20px; border-left: 2px solid var(--accent); }
+
+  /* RIGHT PANEL — RUNTIME */
+  .panel-run {
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+  }
+  .run-controls {
+    padding: 14px 20px;
+    border-bottom: 1px solid var(--border);
+    display: flex;
+    gap: 8px;
+    align-items: center;
+  }
+  .api-input-wrap {
+    flex: 1;
+    position: relative;
+  }
+  .api-input-wrap input {
+    width: 100%;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    color: var(--text);
+    font-family: var(--mono);
+    font-size: 11px;
+    padding: 7px 10px;
+    outline: none;
+    transition: border-color .2s;
+  }
+  .api-input-wrap input:focus { border-color: var(--accent); }
+  .api-input-wrap input::placeholder { color: var(--muted); }
+  .run-btn {
+    background: var(--accent);
+    color: #fff;
+    border: none;
+    border-radius: 4px;
+    font-family: var(--mono);
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: 0.05em;
+    padding: 8px 18px;
+    cursor: pointer;
+    transition: opacity .2s, transform .1s;
+    text-transform: uppercase;
+    white-space: nowrap;
+  }
+  .run-btn:hover { opacity: .85; }
+  .run-btn:active { transform: scale(.97); }
+  .run-btn:disabled { opacity: .35; cursor: not-allowed; transform: none; }
+  .reset-btn {
+    background: transparent;
+    color: var(--muted);
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    font-family: var(--mono);
+    font-size: 11px;
+    padding: 8px 14px;
+    cursor: pointer;
+    transition: all .2s;
+  }
+  .reset-btn:hover { border-color: var(--border2); color: var(--text); }
+  .reset-btn:disabled { opacity: .3; cursor: not-allowed; }
+
+  /* LOG */
+  .log {
+    flex: 1;
+    overflow-y: auto;
+    padding: 16px 20px;
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    background: var(--bg);
+  }
+  .log::-webkit-scrollbar { width: 4px; }
+  .log::-webkit-scrollbar-thumb { background: var(--border2); border-radius: 2px; }
+
+  .log-entry {
+    display: flex;
+    gap: 10px;
+    font-size: 12px;
+    line-height: 1.6;
+    animation: fadeSlide .25s ease forwards;
+    opacity: 0;
+  }
+  @keyframes fadeSlide { to { opacity: 1; transform: none; } from { opacity: 0; transform: translateY(3px); } }
+
+  .log-time { color: var(--muted); font-size: 10px; min-width: 52px; padding-top: 2px; }
+  .log-icon { font-size: 13px; min-width: 18px; }
+  .log-body { flex: 1; }
+  .log-label {
+    font-size: 9px;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    font-weight: 600;
+    margin-bottom: 1px;
+  }
+  .log-text { color: var(--text); word-break: break-all; }
+  .log-sub { color: var(--muted); font-size: 11px; margin-top: 2px; word-break: break-all; }
+
+  .type-think .log-label { color: var(--accent); }
+  .type-tool  .log-label { color: var(--accent2); }
+  .type-result .log-label { color: var(--accent3); }
+  .type-loop  .log-label { color: #7ec8f7; }
+  .type-done  .log-label { color: #6bcf82; }
+  .type-error .log-label { color: #f76f6f; }
+  .type-info  .log-label { color: var(--muted); }
+
+  .iter-divider {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin: 8px 0;
+    font-size: 10px;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: var(--muted);
+  }
+  .iter-divider::before, .iter-divider::after {
+    content: '';
+    flex: 1;
+    height: 1px;
+    background: var(--border);
+  }
+
+  /* RESULT CARDS */
+  .result-section {
+    border-top: 1px solid var(--border);
+    padding: 16px 20px;
+    display: none;
+    gap: 12px;
+    background: var(--surface);
+  }
+  .result-section.show { display: flex; }
+  .weather-card {
+    flex: 1;
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 16px;
+    text-align: center;
+    position: relative;
+    overflow: hidden;
+  }
+  .weather-card::before {
+    content: '';
+    position: absolute;
+    top: 0; left: 0; right: 0;
+    height: 2px;
+  }
+  .weather-card.tokyo::before { background: linear-gradient(90deg, var(--accent), transparent); }
+  .weather-card.paris::before { background: linear-gradient(90deg, var(--accent2), transparent); }
+  .wc-city { font-size: 9px; letter-spacing: 0.2em; text-transform: uppercase; color: var(--muted); margin-bottom: 8px; }
+  .wc-temp { font-family: var(--display); font-size: 32px; font-weight: 300; color: var(--text); letter-spacing: -0.03em; }
+  .wc-desc { font-size: 11px; color: var(--muted); margin-top: 6px; }
+
+  /* STATUS BAR */
+  .status-bar {
+    grid-column: 1 / -1;
+    padding: 8px 20px;
+    border-top: 1px solid var(--border);
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    font-size: 10px;
+    color: var(--muted);
+    background: var(--surface);
+  }
+  .status-indicator {
+    width: 7px; height: 7px;
+    border-radius: 50%;
+    background: var(--muted);
+    transition: background .3s;
+  }
+  .status-indicator.run { background: var(--accent2); box-shadow: 0 0 6px var(--accent2); animation: pulse 1.2s infinite; }
+  .status-indicator.done { background: var(--accent2); }
+  .status-indicator.err { background: #f76f6f; }
+  @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:.4} }
+  #status-text { transition: color .3s; }
+  .stats { margin-left: auto; display: flex; gap: 16px; }
+  .stat-item span:first-child { color: var(--muted); margin-right: 4px; }
+  .stat-item span:last-child { color: var(--text); }
+
+  /* SCROLLBAR RESET */
+  body { overflow: hidden; height: 100vh; }
+
+  @media (max-width: 700px) {
+    body { grid-template-columns: 1fr; grid-template-rows: auto auto 1fr; overflow-y: auto; height: auto; }
+    .panel-code { max-height: 320px; border-right: none; border-bottom: 1px solid var(--border); }
+    header { padding: 18px 20px 14px; }
+    .title { font-size: 16px; }
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <div>
+    <div class="logo">Anthropic / Claude</div>
+    <div class="title">Agentic Loop</div>
+  </div>
+  <div class="badge">Live Demo</div>
+</header>
+
+<!-- LEFT: CODE -->
+<div class="panel-code">
+  <div class="panel-title"><div class="dot"></div>agentic-loop.js — исходный код</div>
+  <pre id="code-view"><span class="cm">// ═══════════════════════════════════════════
+// AGENTIC LOOP — получаем погоду Токио и Парижа
+// Используем Tool Use + while(true) цикл
+// ═══════════════════════════════════════════</span>
+
+<span class="cm">// 1. ОПИСАНИЕ ИНСТРУМЕНТОВ для Клода</span>
+<span class="kw">const</span> <span class="key">tools</span> = [
+  {
+    <span class="key">name</span>: <span class="str">"get_weather"</span>,
+    <span class="key">description</span>: <span class="str">"Получить текущую погоду города"</span>,
+    <span class="key">input_schema</span>: {
+      <span class="key">type</span>: <span class="str">"object"</span>,
+      <span class="key">properties</span>: {
+        <span class="key">city</span>: {
+          <span class="key">type</span>: <span class="str">"string"</span>,
+          <span class="key">description</span>: <span class="str">"Название города"</span>
+        }
+      },
+      <span class="key">required</span>: [<span class="str">"city"</span>]
+    }
+  }
+];
+
+<span class="cm">// 2. СИМУЛЯЦИЯ РЕАЛЬНОГО API ПОГОДЫ
+// (в боевом коде — fetch к openweathermap.org)</span>
+<span class="kw">async function</span> <span class="fn">executeTool</span>(name, input) {
+  <span class="kw">const</span> weatherDB = {
+    <span class="str">"Tokyo"</span>: { temp: <span class="num">23</span>, desc: <span class="str">"ясно"</span>, humidity: <span class="num">61</span> },
+    <span class="str">"Paris"</span>: { temp: <span class="num">15</span>, desc: <span class="str">"облачно"</span>, humidity: <span class="num">73</span> }
+  };
+  <span class="cm">// Имитируем задержку сети</span>
+  <span class="kw">await</span> <span class="fn">sleep</span>(<span class="num">600</span>);
+  <span class="kw">return</span> weatherDB[input.city]
+    ?? { error: <span class="str">"Город не найден"</span> };
+}
+
+<span class="cm">// 3. AGENTIC LOOP — сердце агента</span>
+<span class="hl"><span class="kw">async function</span> <span class="fn">agentLoop</span>(apiKey, task) {</span>
+<span class="hl">  <span class="kw">const</span> messages = [</span>
+<span class="hl">    { role: <span class="str">"user"</span>, content: task }</span>
+<span class="hl">  ];</span>
+<span class="hl">  <span class="kw">let</span> iteration = <span class="num">0</span>;</span>
+<span class="hl">  <span class="kw">const</span> MAX_ITER = <span class="num">10</span>; <span class="cm">// защита от бесконечного цикла</span></span>
+<span class="hl"></span>
+<span class="hl">  <span class="kw">while</span> (iteration &lt; MAX_ITER) {  <span class="cm">// ← ЭТО LOOP</span></span>
+<span class="hl">    iteration++;</span>
+
+    <span class="cm">// Вызываем Claude API</span>
+    <span class="kw">const</span> response = <span class="kw">await</span> <span class="fn">callClaude</span>(apiKey, messages, tools);
+
+    <span class="cm">// Добавляем ответ ассистента в историю</span>
+    messages.<span class="fn">push</span>({
+      role: <span class="str">"assistant"</span>,
+      content: response.content
+    });
+
+<span class="hl">    <span class="cm">// ПРОВЕРЯЕМ stop_reason — главное решение цикла</span></span>
+<span class="hl">    <span class="kw">if</span> (response.stop_reason === <span class="str">"end_turn"</span>) {</span>
+<span class="hl">      <span class="cm">// Задача решена — выходим из цикла</span></span>
+<span class="hl">      <span class="kw">return</span> { done: <span class="kw">true</span>, messages, iteration };</span>
+<span class="hl">    }</span>
+
+<span class="hl">    <span class="kw">if</span> (response.stop_reason === <span class="str">"tool_use"</span>) {</span>
+<span class="hl">      <span class="cm">// Агент хочет вызвать инструмент</span></span>
+      <span class="kw">const</span> toolResults = [];
+
+      <span class="kw">for</span> (<span class="kw">const</span> block <span class="kw">of</span> response.content) {
+        <span class="kw">if</span> (block.type !== <span class="str">"tool_use"</span>) <span class="kw">continue</span>;
+
+        <span class="cm">// Выполняем инструмент</span>
+        <span class="kw">const</span> result = <span class="kw">await</span> <span class="fn">executeTool</span>(
+          block.name, block.input
+        );
+
+        toolResults.<span class="fn">push</span>({
+          type: <span class="str">"tool_result"</span>,
+          tool_use_id: block.id,
+          content: JSON.<span class="fn">stringify</span>(result)
+        });
+      }
+
+      <span class="cm">// Добавляем результаты в историю</span>
+      messages.<span class="fn">push</span>({
+        role: <span class="str">"user"</span>,
+        content: toolResults
+      });
+<span class="hl">      <span class="cm">// Продолжаем цикл с новыми данными</span></span>
+<span class="hl">      <span class="kw">continue</span>;</span>
+<span class="hl">    }</span>
+<span class="hl">  }</span>
+<span class="hl">}</span>
+
+<span class="cm">// 4. ВЫЗОВ CLAUDE API</span>
+<span class="kw">async function</span> <span class="fn">callClaude</span>(apiKey, messages, tools) {
+  <span class="kw">const</span> res = <span class="kw">await</span> <span class="fn">fetch</span>(
+    <span class="str">"https://api.anthropic.com/v1/messages"</span>,
+    {
+      method: <span class="str">"POST"</span>,
+      headers: {
+        <span class="str">"Content-Type"</span>: <span class="str">"application/json"</span>,
+        <span class="str">"x-api-key"</span>: apiKey,
+        <span class="str">"anthropic-version"</span>: <span class="str">"2023-06-01"</span>
+      },
+      body: JSON.<span class="fn">stringify</span>({
+        model: <span class="str">"claude-sonnet-4-20250514"</span>,
+        max_tokens: <span class="num">1024</span>,
+        tools,
+        messages
+      })
+    }
+  );
+  <span class="kw">return await</span> res.<span class="fn">json</span>();
+}
+
+<span class="kw">const</span> <span class="fn">sleep</span> = ms => <span class="kw">new</span> Promise(r => setTimeout(r, ms));</pre>
+</div>
+
+<!-- RIGHT: RUNTIME -->
+<div class="panel-run">
+  <div class="run-controls">
+    <div class="api-input-wrap">
+      <input type="password" id="api-key" placeholder="sk-ant-... (ваш Anthropic API ключ)" autocomplete="off">
+    </div>
+    <button class="run-btn" id="btn-run" onclick="runLoop()">▶ Run</button>
+    <button class="reset-btn" id="btn-reset" onclick="resetLoop()" disabled>Reset</button>
+  </div>
+
+  <div class="log" id="log">
+    <div class="log-entry type-info">
+      <div class="log-time">—</div>
+      <div class="log-icon">◈</div>
+      <div class="log-body">
+        <div class="log-label">Готов</div>
+        <div class="log-text">Введите API ключ и нажмите Run</div>
+        <div class="log-sub">Без ключа — используется симуляция</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="result-section" id="results">
+    <div class="weather-card tokyo">
+      <div class="wc-city">Tokyo</div>
+      <div class="wc-temp" id="r-tokyo-temp">—</div>
+      <div class="wc-desc" id="r-tokyo-desc">—</div>
+    </div>
+    <div class="weather-card paris">
+      <div class="wc-city">Paris</div>
+      <div class="wc-temp" id="r-paris-temp">—</div>
+      <div class="wc-desc" id="r-paris-desc">—</div>
+    </div>
+  </div>
+</div>
+
+<!-- BOTTOM STATUS -->
+<div class="status-bar">
+  <div class="status-indicator" id="s-dot"></div>
+  <span id="status-text">Idle</span>
+  <div class="stats">
+    <div class="stat-item"><span>Итераций:</span><span id="s-iter">0</span></div>
+    <div class="stat-item"><span>Tool calls:</span><span id="s-tools">0</span></div>
+    <div class="stat-item"><span>Время:</span><span id="s-time">—</span></div>
+  </div>
+</div>
+
+<script>
+let startTime, iterCount = 0, toolCount = 0;
+let running = false;
+
+function ts() {
+  if (!startTime) return '00:00';
+  const d = Date.now() - startTime;
+  const s = Math.floor(d/1000), ms = Math.floor((d%1000)/10);
+  return `${String(s).padStart(2,'0')}:${String(ms).padStart(2,'0')}`;
+}
+
+function log(type, label, text, sub='') {
+  const log = document.getElementById('log');
+  const el = document.createElement('div');
+  el.className = `log-entry type-${type}`;
+  const icons = {think:'◆',tool:'⬡',result:'◈',loop:'↻',done:'✓',error:'✕',info:'·'};
+  el.innerHTML = `
+    <div class="log-time">${ts()}</div>
+    <div class="log-icon">${icons[type]||'·'}</div>
+    <div class="log-body">
+      <div class="log-label">${label}</div>
+      <div class="log-text">${text}</div>
+      ${sub ? `<div class="log-sub">${sub}</div>` : ''}
+    </div>`;
+  log.appendChild(el);
+  log.scrollTop = log.scrollHeight;
+}
+
+function logIter(n) {
+  const log = document.getElementById('log');
+  const el = document.createElement('div');
+  el.className = 'iter-divider';
+  el.textContent = `итерация ${n}`;
+  log.appendChild(el);
+}
+
+function setStatus(state, text) {
+  document.getElementById('s-dot').className = 'status-indicator ' + state;
+  document.getElementById('status-text').textContent = text;
+}
+
+function updateStats() {
+  document.getElementById('s-iter').textContent = iterCount;
+  document.getElementById('s-tools').textContent = toolCount;
+  document.getElementById('s-time').textContent = ts();
+}
+
+function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
+
+// Симуляция погоды (если нет API ключа)
+const weatherDB = {
+  'Tokyo': { temp: 23, desc: 'ясно, ветер 3 м/с', humidity: 61 },
+  'Paris': { temp: 15, desc: 'облачно, влажность высокая', humidity: 73 }
+};
+
+async function executeTool(name, input) {
+  await sleep(500);
+  if (name === 'get_weather') {
+    return weatherDB[input.city] ?? { error: 'Город не найден' };
+  }
+  return { error: 'Неизвестный инструмент' };
+}
+
+// Определение инструментов
+const tools = [{
+  name: 'get_weather',
+  description: 'Получить текущую погоду для города. Возвращает температуру, описание и влажность.',
+  input_schema: {
+    type: 'object',
+    properties: {
+      city: { type: 'string', description: 'Название города на английском' }
+    },
+    required: ['city']
+  }
+}];
+
+async function callClaudeReal(apiKey, messages) {
+  const res = await fetch('https://api.anthropic.com/v1/messages', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'x-api-key': apiKey,
+      'anthropic-version': '2023-06-01',
+      'anthropic-dangerous-direct-browser-access': 'true'
+    },
+    body: JSON.stringify({
+      model: 'claude-sonnet-4-20250514',
+      max_tokens: 1024,
+      tools,
+      messages
+    })
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new Error(err.error?.message || `HTTP ${res.status}`);
+  }
+  return res.json();
+}
+
+// Симуляция ответов Клода (без ключа)
+async function callClaude_sim(messages) {
+  await sleep(400);
+  const history = messages.filter(m => m.role !== 'user' || typeof m.content === 'string');
+  const toolResultsCount = messages.filter(m =>
+    m.role === 'user' && Array.isArray(m.content) &&
+    m.content.some(c => c.type === 'tool_result')
+  ).length;
+
+  if (toolResultsCount === 0) {
+    return {
+      stop_reason: 'tool_use',
+      content: [{
+        type: 'text',
+        text: 'Мне нужно получить погоду для обоих городов. Начну с Токио.'
+      }, {
+        type: 'tool_use',
+        id: 'tool_' + Date.now(),
+        name: 'get_weather',
+        input: { city: 'Tokyo' }
+      }]
+    };
+  } else if (toolResultsCount === 1) {
+    return {
+      stop_reason: 'tool_use',
+      content: [{
+        type: 'text',
+        text: 'Отлично, данные по Токио получены. Теперь запрошу Париж.'
+      }, {
+        type: 'tool_use',
+        id: 'tool_' + Date.now(),
+        name: 'get_weather',
+        input: { city: 'Paris' }
+      }]
+    };
+  } else {
+    return {
+      stop_reason: 'end_turn',
+      content: [{
+        type: 'text',
+        text: 'Задача выполнена. Токио: 23°C (ясно). Париж: 15°C (облачно).'
+      }]
+    };
+  }
+}
+
+async function runLoop() {
+  if (running) return;
+  running = true;
+  startTime = Date.now();
+  iterCount = 0; toolCount = 0;
+
+  const apiKey = document.getElementById('api-key').value.trim();
+  const useReal = apiKey.startsWith('sk-ant-');
+
+  document.getElementById('btn-run').disabled = true;
+  document.getElementById('btn-reset').disabled = false;
+  document.getElementById('log').innerHTML = '';
+  document.getElementById('results').classList.remove('show');
+  setStatus('run', useReal ? 'Работает (реальный API)' : 'Работает (симуляция)');
+
+  log('info', useReal ? 'Режим: реальный API' : 'Режим: симуляция', 
+    'model: claude-sonnet-4-20250514',
+    useReal ? 'Запросы идут на api.anthropic.com' : 'API ключ не введён — используется симуляция ответов');
+
+  await sleep(300);
+
+  const task = 'Получи текущую погоду для Токио и Парижа используя инструмент get_weather. Нужна температура и описание для обоих городов.';
+
+  log('think', 'Инициализация', 'Задача поставлена агенту',
+    `"${task}"`);
+
+  await sleep(350);
+
+  const messages = [{ role: 'user', content: task }];
+  const MAX_ITER = 8;
+  const weatherResults = {};
+
+  // === AGENTIC LOOP ===
+  while (iterCount < MAX_ITER) {
+    iterCount++;
+    logIter(iterCount);
+    updateStats();
+
+    log('loop', `Итерация ${iterCount}`, 'Отправляю запрос к Claude...',
+      `messages в контексте: ${messages.length}`);
+
+    await sleep(200);
+
+    let response;
+    try {
+      if (useReal) {
+        response = await callClaudeReal(apiKey, messages);
+      } else {
+        response = await callClaude_sim(messages);
+      }
+    } catch(e) {
+      log('error', 'Ошибка API', e.message);
+      setStatus('err', 'Ошибка');
+      running = false;
+      document.getElementById('btn-run').disabled = false;
+      return;
+    }
+
+    // Добавляем ответ ассистента
+    messages.push({ role: 'assistant', content: response.content });
+
+    // Показываем текстовую часть ответа
+    for (const block of response.content) {
+      if (block.type === 'text' && block.text) {
+        log('think', 'Claude думает', block.text);
+        await sleep(200);
+      }
+    }
+
+    log('loop', 'Проверка stop_reason',
+      `stop_reason = "${response.stop_reason}"`,
+      response.stop_reason === 'end_turn' ? '→ Задача решена, выходим из цикла' : '→ Нужны tool calls, продолжаем');
+
+    await sleep(250);
+
+    // === ПРОВЕРКА STOP REASON ===
+    if (response.stop_reason === 'end_turn') {
+      log('done', 'Цикл завершён', `Выполнено за ${iterCount} итераций, ${toolCount} вызовов инструментов`);
+      break;
+    }
+
+    if (response.stop_reason === 'tool_use') {
+      const toolResults = [];
+
+      for (const block of response.content) {
+        if (block.type !== 'tool_use') continue;
+
+        log('tool', `Tool call: ${block.name}`,
+          `Вызываю get_weather("${block.input.city}")`,
+          `tool_use_id: ${block.id}`);
+
+        await sleep(150);
+
+        const result = await executeTool(block.name, block.input);
+        toolCount++;
+        updateStats();
+
+        if (block.input.city === 'Tokyo') {
+          weatherResults.tokyo = result;
+        } else if (block.input.city === 'Paris') {
+          weatherResults.paris = result;
+        }
+
+        log('result', 'Tool result',
+          `${block.input.city}: ${result.temp}°C, ${result.desc}`,
+          JSON.stringify(result));
+
+        toolResults.push({
+          type: 'tool_result',
+          tool_use_id: block.id,
+          content: JSON.stringify(result)
+        });
+
+        await sleep(200);
+      }
+
+      messages.push({ role: 'user', content: toolResults });
+    }
+
+    updateStats();
+  }
+
+  // Показываем результаты
+  if (weatherResults.tokyo) {
+    document.getElementById('r-tokyo-temp').textContent = weatherResults.tokyo.temp + '°C';
+    document.getElementById('r-tokyo-desc').textContent = weatherResults.tokyo.desc;
+  }
+  if (weatherResults.paris) {
+    document.getElementById('r-paris-temp').textContent = weatherResults.paris.temp + '°C';
+    document.getElementById('r-paris-desc').textContent = weatherResults.paris.desc;
+  }
+  if (weatherResults.tokyo || weatherResults.paris) {
+    document.getElementById('results').classList.add('show');
+  }
+
+  document.getElementById('s-time').textContent = ((Date.now() - startTime)/1000).toFixed(1) + 's';
+  setStatus('done', `Завершено — ${iterCount} итераций, ${toolCount} tool calls`);
+  running = false;
+  document.getElementById('btn-run').disabled = false;
+}
+
+function resetLoop() {
+  if (running) return;
+  document.getElementById('log').innerHTML = '';
+  document.getElementById('results').classList.remove('show');
+  document.getElementById('s-dot').className = 'status-indicator';
+  document.getElementById('status-text').textContent = 'Idle';
+  document.getElementById('s-iter').textContent = '0';
+  document.getElementById('s-tools').textContent = '0';
+  document.getElementById('s-time').textContent = '—';
+  document.getElementById('btn-reset').disabled = true;
+  iterCount = 0; toolCount = 0; startTime = null;
+
+  document.getElementById('log').innerHTML = `
+    <div class="log-entry type-info">
+      <div class="log-time">—</div>
+      <div class="log-icon">◈</div>
+      <div class="log-body">
+        <div class="log-label">Готов</div>
+        <div class="log-text">Введите API ключ и нажмите Run</div>
+        <div class="log-sub">Без ключа — используется симуляция</div>
+      </div>
+    </div>`;
+}
+
+// Live timer
+setInterval(() => {
+  if (running && startTime) {
+    document.getElementById('s-time').textContent = ((Date.now()-startTime)/1000).toFixed(1)+'s';
+  }
+}, 100);
+</script>
+</body>
+</html>
